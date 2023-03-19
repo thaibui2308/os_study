@@ -29,6 +29,18 @@ tablePtr createPageTable(unsigned int levelCount, unsigned int *bitsAllocation) 
     return pageTable;
 }
 
+unsigned int getBitMaskForLevel(tablePtr pageTablePtr, int level) {
+    return pageTablePtr->bitmask[(int) level];
+}
+
+unsigned int getBitShiftForLevel(tablePtr pageTablePtr, int level) {
+    return pageTablePtr->bitShift[(int) level];
+}
+
+void ptab_insert_vpn2pfn(tablePtr pageTablePtr, unsigned int address, unsigned int frame) {
+    level_insert_vpn2pfn(pageTablePtr->tableRootNode, address, frame);
+}
+
 /* Implementation for Level methods */
 levelPtr createLevel(tablePtr table, unsigned int depth) {
     levelPtr level;
@@ -37,13 +49,9 @@ levelPtr createLevel(tablePtr table, unsigned int depth) {
     level->depth = depth;
     level->isLeaf = false;
 
-    /* If this is the first level, point back to the PageTable */
-    if (depth == 0) {
-        level->pageTablePtr = table;
-    } else {
-        level->pageTablePtr = NULL;
-    }
-
+    /* Set pageTablePtr pointer to the PageTable */
+    level->pageTablePtr = table;
+    
     /* If this is the leaf node, create a map instead of a next-level array */
     if (table->levelCount-1 == depth) { 
         /* Set isLeaf to true and malloc the size of Map** */
@@ -60,4 +68,65 @@ levelPtr createLevel(tablePtr table, unsigned int depth) {
         }
     }
     return level;
+}
+
+void level_insert_vpn2pfn(levelPtr lPtr, unsigned int address, unsigned int frame) {
+    unsigned int pNumber;
+    Level* ptr;
+
+    ptr = lPtr;
+    
+    /* While loop for inserting VPN */
+    while (!ptr->isLeaf) {
+        /* Find index into current page level */
+        pNumber = virtualAddressToVPN(address, 
+                                    ptr->pageTablePtr->bitmask[ptr->depth],
+                                    ptr->pageTablePtr->bitShift[ptr->depth]);
+
+        /* If next level is not found */
+        if (ptr->next[pNumber] == NULL) {
+            /* Create new level */
+            ptr->next[pNumber] = createLevel(ptr->pageTablePtr, ptr->depth+1);
+        }
+
+        /* Set ptr to new level and increase depth by 1*/
+        ptr = ptr->next[pNumber];
+    }
+
+    /* Processing leaf node */
+    pNumber = virtualAddressToVPN(address, 
+                                    ptr->pageTablePtr->bitmask[ptr->depth],
+                                    ptr->pageTablePtr->bitShift[ptr->depth]);
+    ptr->map[pNumber]->isValid = true;
+    ptr->map[pNumber]->frame = frame;
+
+}
+
+mapPtr lookup_vpn2pfn(PageTable *pageTable, unsigned int virtualAddress) {
+    mapPtr map;
+    Level* ptr;
+    unsigned int pNumber;
+
+    /* Start at the root node */
+    ptr = pageTable->tableRootNode;
+
+    /* While-loop for looking up VPN */
+    while (!ptr->isLeaf) {
+        pNumber = virtualAddressToVPN(virtualAddress, 
+                                    ptr->pageTablePtr->bitmask[ptr->depth],
+                                    ptr->pageTablePtr->bitShift[ptr->depth]);
+        if (ptr->next[pNumber] == NULL) {
+            return NULL;
+        }
+        ptr = ptr->next[pNumber];
+    }
+
+    /* Check if leaf node map contains desired entry */
+    pNumber = virtualAddressToVPN(virtualAddress, 
+                                    ptr->pageTablePtr->bitmask[ptr->depth],
+                                    ptr->pageTablePtr->bitShift[ptr->depth]);
+    if (ptr->map[pNumber] == NULL) {
+        return NULL;
+    }
+    return ptr->map[pNumber];
 }
