@@ -1,39 +1,38 @@
 #ifndef PAGE_TABLE_H
 #define PAGE_TABLE_H
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdbool.h>
+#include "utils.h"
 #include "map.h"
 
 typedef struct Level {
-    void* pageTablePtr;
-    int depth;
+    tablePtr pageTablePtr;
+    unsigned int depth;
     bool isLeaf;
     Level** next;
-    mapPtr map;
+    mapPtr* map;
 } Level;
 
 typedef struct Level * levelPtr;
 
 /* Methods for Level struct */
-levelPtr createLevel(int entrycount);
-void table_insert_vpn2pfn(levelPtr levelPtr, unsigned int address, unsigned int frame);
+levelPtr createLevel(tablePtr table, unsigned int depth);
+void tab_insert_vpn2pfn(levelPtr levelPtr, unsigned int address, unsigned int frame);
+mapPtr lookup_vpn2pfn(PageTable *pageTable, unsigned int virtualAddress);
 
 typedef struct PageTable {
     levelPtr tableRootNode;
-    int levelCount;
+    unsigned int levelCount;
     unsigned int *bitmask;
     unsigned int *bitShift;
-    int *entryCount;
+    unsigned int *entryCount;
 } PageTable;
 
 typedef struct PageTable * tablePtr;
 
 /* Methods for PageTable struct */
-tablePtr createPageTable(int levelCount);
-unsigned int getBitMaskForLevel(int level);
-unsigned int getBitShiftForLevel(int level);
+tablePtr createPageTable(unsigned int levelCount, unsigned int *bitsAllocation);
+unsigned int getBitMaskForLevel(unsigned int level);
+unsigned int getBitShiftForLevel(unsigned int level);
 void ptab_insert_vpn2pfn(tablePtr pageTablePtr, unsigned int address, unsigned int frame);
 
 #endif
