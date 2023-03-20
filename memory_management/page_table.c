@@ -1,5 +1,4 @@
 #include "page_table.h"
-#include "vaddr_tracereader.h"
 
 /* Implementation for PageTable methods */
 tablePtr createPageTable(unsigned int levelCount, unsigned int *bitsAllocation) {
@@ -63,6 +62,7 @@ levelPtr createLevel(tablePtr table, unsigned int depth) {
             level->map[j] = createMap();
         }
     } else {
+        level->next = (levelPtr*) malloc(sizeof(levelPtr)*table->entryCount[depth]);
         for (int j = 0; j < table->entryCount[depth]; j++) {
             level->next[j] = NULL;
         }
@@ -103,7 +103,6 @@ void level_insert_vpn2pfn(levelPtr lPtr, unsigned int address, unsigned int fram
 }
 
 mapPtr lookup_vpn2pfn(PageTable *pageTable, unsigned int virtualAddress) {
-    mapPtr map;
     Level* ptr;
     unsigned int pNumber;
 

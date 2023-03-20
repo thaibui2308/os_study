@@ -5,22 +5,16 @@
 #include "map.h"
 
 typedef struct Level {
-    tablePtr pageTablePtr;
+    struct PageTable *pageTablePtr;
     unsigned int depth;
     bool isLeaf;
-    Level** next;
+    struct Level** next;
     mapPtr* map;
 } Level;
 
 typedef struct Level * levelPtr;
-
-/* Methods for Level struct */
-levelPtr createLevel(tablePtr table, unsigned int depth);
-void level_insert_vpn2pfn(levelPtr lPtr, unsigned int address, unsigned int frame);
-mapPtr lookup_vpn2pfn(PageTable *pageTable, unsigned int virtualAddress);
-
 typedef struct PageTable {
-    levelPtr tableRootNode;
+    struct Level *tableRootNode;
     unsigned int levelCount;
     unsigned int *bitmask;
     unsigned int *bitShift;
@@ -34,5 +28,10 @@ tablePtr createPageTable(unsigned int levelCount, unsigned int *bitsAllocation);
 unsigned int getBitMaskForLevel(tablePtr pageTablePtr, int level);
 unsigned int getBitShiftForLevel(tablePtr pageTablePtr, int level);
 void ptab_insert_vpn2pfn(tablePtr pageTablePtr, unsigned int address, unsigned int frame);
+
+/* Methods for Level struct */
+levelPtr createLevel(tablePtr table, unsigned int depth);
+void level_insert_vpn2pfn(levelPtr lPtr, unsigned int address, unsigned int frame);
+mapPtr lookup_vpn2pfn(PageTable *pageTable, unsigned int virtualAddress);
 
 #endif
