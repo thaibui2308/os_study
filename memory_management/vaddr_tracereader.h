@@ -8,6 +8,7 @@
 #include <stdint.h>
 #else
 /* C includes */
+#include <stdio.h>
 #include <inttypes.h>
 #endif 
 

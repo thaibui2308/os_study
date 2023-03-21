@@ -1,14 +1,15 @@
+#include "vaddr_tracereader.h"
+#include "page_table.h"
+#include "print_helpers.h"
+// #include "tlb.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <getopt.h>
 #include <string.h>
 
-#include "vaddr_tracereader.h"
-#include "page_table.h"
-#include "print_helpers.h"
-
 #define DEFAULT_N_FLAG 150
 #define DEFAULT_C_FLAG 0
+
 
 int main(int argc, char **argv) {
     /* Trace filename */
@@ -103,20 +104,51 @@ int main(int argc, char **argv) {
         }
     }
 
-    for (int i = 0; i < LevelCount; i++) { 
-        printf("Bits allocated for level %d: %d\n", i, *(bitsAllocation+i));
-    }
-
     pageTable = createPageTable(LevelCount, bitsAllocation);
+
+    for (int i = 0; i < LevelCount; i++) { 
+        printf("Bits Shift for level %d: %d\n", i, pageTable->bitShift[i]);
+    }
 
     /* For testing purpose only */
     if (IO_Worker.levelbitmasks) {
         printf("trace filename: %s\n",filename);
         printf("-n is set to: %d\n",N_FLAG );
         printf("-c is set to: %d\n",C_FLAG);
-        for (int i = 0; i < LevelCount; i++) {
-            report_levelbitmasks(i, pageTable->bitmask+i);
+        
+        report_levelbitmasks(LevelCount, pageTable->bitmask);
+    } else {
+        /* Open trace file */
+        FILE *ifp;
+        unsigned int address;
+        unsigned int i = 0;
+        unsigned int frameCount = 0;
+        p2AddrTr trace;
+
+        if ((ifp = fopen(filename,"rb")) == NULL) {
+            fprintf(stderr,"cannot open %s for reading\n",argv[1]);
+            exit(1);
         }
+	
+        while (!feof(ifp)) {
+            /* get next address and process */
+            if (NextAddress(ifp, &trace) && i < N_FLAG) {
+                address = trace.addr;
+                printf("%d. %08lx\n", i+1,(unsigned long int) address);
+                /**
+                 * @todo create a frame tracker
+                 * initialize the tlb
+                 * insert new address into the PageTable and tlb
+                 */
+                ptab_insert_vpn2pfn(pageTable, address, frameCount);
+                frameCount++;
+                i++;
+            }
+        }	
+
+        /* clean up and return success */
+        printf("%d\n", frameCount);
+        fclose(ifp);
     }
 
     return 0;

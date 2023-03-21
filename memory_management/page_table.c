@@ -5,23 +5,26 @@ tablePtr createPageTable(unsigned int levelCount, unsigned int *bitsAllocation) 
     tablePtr pageTable;
     pageTable = (tablePtr) malloc(sizeof(PageTable));
 
+
+    pageTable->totalFrames = 0;
+    pageTable->pageHit = 0;
+    pageTable->pageMiss = 0;
     pageTable->bitmask = (unsigned int*) malloc(sizeof(unsigned int) * levelCount);
     pageTable->bitShift = (unsigned int*) malloc(sizeof(unsigned int) * levelCount);
     pageTable->entryCount = (unsigned int*) malloc(sizeof(unsigned int) * levelCount);
 
     pageTable->levelCount = levelCount;
 
-    unsigned int curr = 0;
 
     for (int i = 0; i < levelCount; i++) {
         pageTable->entryCount[i] = 1 << bitsAllocation[i];
-        pageTable->bitShift[i] = ADDR_SIZE - (bitsAllocation[i]+curr);
         if (i == 0) {
+            pageTable->bitShift[i] = ADDR_SIZE - bitsAllocation[i];
             pageTable->bitmask[i] = bitmask(pageTable->bitShift[i], ADDR_SIZE);
         } else {
-            pageTable->bitmask[i] = bitmask(pageTable->bitShift[i], pageTable->bitShift[i-1]);
+            pageTable->bitShift[i] = pageTable->bitShift[i-1] - bitsAllocation[i];
+            pageTable->bitmask[i] = bitmask(pageTable->bitShift[i], pageTable->bitShift[i-1]-1);
         }
-        curr = pageTable->bitShift[i];
     }
 
     pageTable->tableRootNode = createLevel(pageTable, 0);
@@ -38,6 +41,10 @@ unsigned int getBitShiftForLevel(tablePtr pageTablePtr, int level) {
 
 void ptab_insert_vpn2pfn(tablePtr pageTablePtr, unsigned int address, unsigned int frame) {
     level_insert_vpn2pfn(pageTablePtr->tableRootNode, address, frame);
+}
+
+mapPtr ptab_lookup_vpn2pfn(PageTable *pageTable, unsigned int virtualAddress) {
+    return level_lookup_vpn2pfn(pageTable->tableRootNode, virtualAddress);
 }
 
 /* Implementation for Level methods */
@@ -102,12 +109,11 @@ void level_insert_vpn2pfn(levelPtr lPtr, unsigned int address, unsigned int fram
 
 }
 
-mapPtr lookup_vpn2pfn(PageTable *pageTable, unsigned int virtualAddress) {
-    Level* ptr;
+mapPtr level_lookup_vpn2pfn(levelPtr lPtr, unsigned int virtualAddress) {
+    levelPtr ptr;
     unsigned int pNumber;
 
-    /* Start at the root node */
-    ptr = pageTable->tableRootNode;
+    ptr = lPtr;
 
     /* While-loop for looking up VPN */
     while (!ptr->isLeaf) {
@@ -128,4 +134,9 @@ mapPtr lookup_vpn2pfn(PageTable *pageTable, unsigned int virtualAddress) {
         return NULL;
     }
     return ptr->map[pNumber];
+}
+
+/* Additional helpers */
+void byteCount(levelPtr root, unsigned int *count) {
+    
 }
