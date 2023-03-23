@@ -7,6 +7,7 @@ tablePtr createPageTable(unsigned int levelCount, unsigned int *bitsAllocation) 
 
 
     pageTable->totalFrames = 0;
+    pageTable->totalBits = 0;
     pageTable->pageHit = 0;
     pageTable->pageMiss = 0;
     pageTable->bitmask = (unsigned int*) malloc(sizeof(unsigned int) * levelCount);
@@ -17,6 +18,7 @@ tablePtr createPageTable(unsigned int levelCount, unsigned int *bitsAllocation) 
 
 
     for (int i = 0; i < levelCount; i++) {
+        pageTable->totalBits += bitsAllocation[i];
         pageTable->entryCount[i] = 1 << bitsAllocation[i];
         if (i == 0) {
             pageTable->bitShift[i] = ADDR_SIZE - bitsAllocation[i];
@@ -78,7 +80,8 @@ levelPtr createLevel(tablePtr table, unsigned int depth) {
 }
 
 void level_insert_vpn2pfn(levelPtr lPtr, unsigned int address, unsigned int frame) {
-    unsigned int pNumber;
+    unsigned int pNumber, totalBits;
+    totalBits = lPtr->pageTablePtr->totalBits;
     Level* ptr;
 
     ptr = lPtr;
@@ -101,9 +104,7 @@ void level_insert_vpn2pfn(levelPtr lPtr, unsigned int address, unsigned int fram
     }
 
     /* Processing leaf node */
-    pNumber = virtualAddressToVPN(address, 
-                                    ptr->pageTablePtr->bitmask[ptr->depth],
-                                    ptr->pageTablePtr->bitShift[ptr->depth]);
+    pNumber = bitmask(0, ADDR_SIZE-totalBits-1) & address;
     ptr->map[pNumber]->isValid = true;
     ptr->map[pNumber]->frame = frame;
 
@@ -112,6 +113,8 @@ void level_insert_vpn2pfn(levelPtr lPtr, unsigned int address, unsigned int fram
 mapPtr level_lookup_vpn2pfn(levelPtr lPtr, unsigned int virtualAddress) {
     levelPtr ptr;
     unsigned int pNumber;
+    unsigned int totalBits = lPtr->pageTablePtr->totalBits;
+
 
     ptr = lPtr;
 
@@ -127,10 +130,8 @@ mapPtr level_lookup_vpn2pfn(levelPtr lPtr, unsigned int virtualAddress) {
     }
 
     /* Check if leaf node map contains desired entry */
-    pNumber = virtualAddressToVPN(virtualAddress, 
-                                    ptr->pageTablePtr->bitmask[ptr->depth],
-                                    ptr->pageTablePtr->bitShift[ptr->depth]);
-    if (ptr->map[pNumber] == NULL) {
+    pNumber = bitmask(0, ADDR_SIZE-totalBits-1) & virtualAddress;
+    if (ptr->map[pNumber]->isValid == false) {
         return NULL;
     }
     return ptr->map[pNumber];

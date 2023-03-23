@@ -19,6 +19,7 @@ typedef struct PageTable {
     unsigned int *bitmask;
     unsigned int *bitShift;
     unsigned int *entryCount;
+    unsigned int totalBits;
 
     /* Additional information to keep track of the TLB */
     unsigned int totalFrames;

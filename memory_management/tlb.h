@@ -1,26 +1,38 @@
+#ifndef TLB_H
+#define TLB_H 
+
 #include <stdlib.h>
 #include <stdbool.h>
 
 #define MAX_CAPACITY 10000 // Maximum number of entries the map can hold
+typedef struct {
+    unsigned int vpn;
+    unsigned int frame;
+    unsigned long last_access_time;
+} TLBEntry;
 
-/* TLB Entry node */
-typedef struct tlb_entry_t {
-    unsigned int page_num; // Key
-    unsigned int frame_num; // Value
-} tlb_entry_t;
+typedef struct {
+    unsigned int cache_cap;
+    unsigned int curr_cache_cap;
+    unsigned int lru_cap;
+    unsigned int curr_lru_cap;
+    unsigned int vpn_size;
+    unsigned int vpn_shift;
+    unsigned int vpn_mask;
+    unsigned int tlb_hit;
+    unsigned int tlb_miss;
+    TLBEntry* cache;
+    TLBEntry* lru;
+} TLB;
 
-/* TLB table */
-typedef struct tlb_t{
-    tlb_entry_t *entries;
-    unsigned int size;
-    unsigned int capacity;
-} tlb_t;
+unsigned int tlb_lookup(TLB* tlb, unsigned int virtual_address, unsigned long curr_time, bool* vpn_found_tlb);
 
-/* Methods */
-tlb_t *createTLB(unsigned int capacity);
-int getIndex(tlb_t *tlb, unsigned int page_num);
-bool contains(tlb_t *tlb, unsigned int page_num);
-unsigned int getFrameNum(tlb_t *tlb, unsigned int page_num);
-void setFrameNum(tlb_t *tlb, unsigned int page_num, unsigned int frame_num);
-void delete(tlb_t *tlb, unsigned int page_num);
-void cleanup(tlb_t *tlb);
+void tlb_insert(TLB* tlb, unsigned int virtual_address, unsigned int frame, unsigned long curr_time);
+
+unsigned int lru_replacement_policy(TLB* tlb, unsigned int vpn, unsigned long curr_time);
+
+TLB* tlb_init(unsigned int cache_cap, unsigned int lru_cap, unsigned int vpn_size);
+
+void tlb_free(TLB* tlb);
+
+#endif

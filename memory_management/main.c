@@ -1,7 +1,7 @@
 #include "vaddr_tracereader.h"
 #include "page_table.h"
 #include "print_helpers.h"
-// #include "tlb.h"
+#include "tlb.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <getopt.h>
@@ -9,6 +9,7 @@
 
 #define DEFAULT_N_FLAG 150
 #define DEFAULT_C_FLAG 0
+#define DEFAULT_LRU_CAPACITY 8
 
 
 int main(int argc, char **argv) {
@@ -106,10 +107,6 @@ int main(int argc, char **argv) {
 
     pageTable = createPageTable(LevelCount, bitsAllocation);
 
-    for (int i = 0; i < LevelCount; i++) { 
-        printf("Bits Shift for level %d: %d\n", i, pageTable->bitShift[i]);
-    }
-
     /* For testing purpose only */
     if (IO_Worker.levelbitmasks) {
         printf("trace filename: %s\n",filename);
@@ -124,30 +121,75 @@ int main(int argc, char **argv) {
         unsigned int i = 0;
         unsigned int frameCount = 0;
         p2AddrTr trace;
+        
 
         if ((ifp = fopen(filename,"rb")) == NULL) {
             fprintf(stderr,"cannot open %s for reading\n",argv[1]);
             exit(1);
         }
+
+        /* Initialize TLB */
+        TLB* tlb;
+        if (C_FLAG <= 0) {
+            tlb = NULL;
+        } else {
+            tlb = tlb_init(C_FLAG, DEFAULT_LRU_CAPACITY, pageTable->totalBits); 
+        }
 	
         while (!feof(ifp)) {
+            unsigned int offset, foundFrame, page_number;
+
             /* get next address and process */
             if (NextAddress(ifp, &trace) && i < N_FLAG) {
+                bool tlbHit = false;
+                bool pageTableHit = false;
                 address = trace.addr;
-                printf("%d. %08lx\n", i+1,(unsigned long int) address);
-                /**
-                 * @todo create a frame tracker
-                 * initialize the tlb
-                 * insert new address into the PageTable and tlb
-                 */
-                ptab_insert_vpn2pfn(pageTable, address, frameCount);
-                frameCount++;
+
+                /* extract offset and page number */
+                page_number = bitmask(sum, ADDR_SIZE) & address;
+                offset = bitmask(0, ADDR_SIZE-sum-1) & address;
+                
+                /* Search the TLB */
+                unsigned int physicalAddr = tlb_lookup(tlb, address, i, &tlbHit);
+
+                /* If entry is not in TLB */
+                if (!tlbHit) {
+                    tlb->tlb_miss++;
+                    /* Traverse the page table */
+                    mapPtr map = ptab_lookup_vpn2pfn(pageTable, address);
+                    /* If entry is not in PageTable */
+                    if (map == NULL) {
+                        /* Insert entry to PageTable */
+                        ptab_insert_vpn2pfn(pageTable, address, frameCount);
+                        pageTable->pageMiss++;
+
+                        /* Insert new entry to TLB and increase frameCount */
+                        tlb_insert(tlb, address, frameCount, i);
+                        
+                    } else {
+                        pageTable->pageHit++;
+                        pageTableHit = true;
+
+                        tlb_insert(tlb, page_number, frameCount, i);
+                        
+                    }
+                    foundFrame = frameCount;
+                    physicalAddr = offset + (foundFrame << (ADDR_SIZE-sum));
+                    frameCount++;
+                } else {
+                    tlbHit = true;
+                    tlb->tlb_hit++;
+                }
+                // report_va2pa_TLB_PTwalk(address, physicalAddr, tlbHit, pageTableHit);
+                report_virtualAddr2physicalAddr(address, physicalAddr);
+                printf("\t \t \t \t \t \t %d\n", pageTableHit);
                 i++;
             }
         }	
+        
+        free(tlb);
 
         /* clean up and return success */
-        printf("%d\n", frameCount);
         fclose(ifp);
     }
 
