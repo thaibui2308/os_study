@@ -107,9 +107,7 @@ void level_insert_vpn2pfn(levelPtr lPtr, unsigned int address, unsigned int fram
                 ptr->pageTablePtr->bitShift[ptr->depth]);
 
     ptr->current_size++;
-    if (ptr->map == NULL) {
-        printf("no map entry\n");
-    }
+    
     ptr->map[pNumber]->isValid = true;
     ptr->map[pNumber]->frame = frame;
     // printf("Success!\n\n"); 

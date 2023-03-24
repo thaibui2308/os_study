@@ -5,6 +5,5 @@ mapPtr createMap() {
     map = (mapPtr) malloc(sizeof(Map));
 
     map->isValid = false;
-    map->frame = -1;
     return map;
 }

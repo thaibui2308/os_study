@@ -205,17 +205,18 @@ int main(int argc, char **argv) {
                 }
                 else {
                     mapPtr map = ptab_lookup_vpn2pfn(pageTable, address);
+
                     if (map == NULL) {
                         /* Insert entry to PageTable */
                         ptab_insert_vpn2pfn(pageTable, address, frameCount);
                         pageTableHit = false;
                         pageTable->pageMiss++;  
-                        frameCount++;
                         foundFrame = frameCount;
+                        frameCount++;
                     } else {
                         pageTable->pageHit++;
                         pageTableHit = true;    
-                        foundFrame = map->frame;                    
+                        foundFrame = map->frame;  
                     }
                     physicalAddr = offset + (foundFrame << (ADDR_SIZE-sum));
                 }
@@ -233,7 +234,7 @@ int main(int argc, char **argv) {
                                                     pageTable->bitShift[j]);
                     }
 
-                    report_pagetable_map(LevelCount, pages, frameCount);
+                    report_pagetable_map(LevelCount, pages, foundFrame);
                 } else if (IO_Worker.offset) {
                     hexnum(offset);
                 }
