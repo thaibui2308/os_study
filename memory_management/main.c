@@ -1,4 +1,3 @@
-
 #include "vaddr_tracereader.h"
 #include "page_table.h"
 #include "print_helpers.h"
@@ -169,8 +168,6 @@ int main(int argc, char **argv) {
                 page_number = bitmask(sum, ADDR_SIZE) & address;
                 offset = bitmask(0, ADDR_SIZE-sum-1) & address;
                 
-
-
                 /* If entry is not in TLB */
                 if (tlb != NULL) {
                     physicalAddr = contains(tlb, address, i, &tlbHit);
@@ -182,8 +179,10 @@ int main(int argc, char **argv) {
                         /* If entry is not in PageTable */
                         if (map == NULL) {
                             /* Insert entry to PageTable */
-                            pageTable->pageMiss++;
                             ptab_insert_vpn2pfn(pageTable, address, frameCount);
+                            pageTableHit = false;
+                            pageTable->pageMiss++;
+
                             foundFrame = frameCount;
                             /* Insert new entry to TLB and increase frameCount */
                             insertTLB(tlb, address, frameCount, i);
@@ -252,11 +251,7 @@ int main(int argc, char **argv) {
                             addr_hit,
                             frameCount,
                             num_bytes);
-            exit(0);
         }
-
-        /* clean up and return success */
-        fclose(ifp);
     }
 
     return 0;

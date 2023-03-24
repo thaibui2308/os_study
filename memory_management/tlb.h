@@ -35,4 +35,10 @@ TLB* createTLB(unsigned int cache_cap, unsigned int lru_cap, unsigned int vpn_si
 
 void freeTLB(TLB* tlb);
 
+int compare_tlb_entries(const void* a, const void* b);
+
+void sort_tlb_cache_and_lru(TLB* tlb);
+
+
+
 #endif
