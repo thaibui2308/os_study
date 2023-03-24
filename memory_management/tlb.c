@@ -9,7 +9,7 @@ unsigned int mask(int start, int end) {
     return ((1 << (end - start + 1)) - 1) << start;
 }
 
-TLB* tlb_init(unsigned int cache_cap, unsigned int lru_cap, unsigned int vpn_size) {
+TLB* createTLB(unsigned int cache_cap, unsigned int lru_cap, unsigned int vpn_size) {
     TLB* tlb = (TLB*) malloc(sizeof(TLB));
     tlb->cache_cap = cache_cap;
     tlb->curr_cache_cap = 0;
@@ -21,7 +21,6 @@ TLB* tlb_init(unsigned int cache_cap, unsigned int lru_cap, unsigned int vpn_siz
     tlb->vpn_shift = TOTAL_ADDR_SIZE-vpn_size;
     
     tlb->vpn_mask = mask(0, vpn_size-1);
-    printf("shift: %08lx \t mask: %08lx\n", (unsigned long int) tlb->vpn_shift, (unsigned long int) tlb->vpn_mask);
 
     tlb->tlb_hit = 0;
     tlb->tlb_miss = 0;
@@ -30,13 +29,13 @@ TLB* tlb_init(unsigned int cache_cap, unsigned int lru_cap, unsigned int vpn_siz
     return tlb;
 }
 
-void tlb_free(TLB* tlb) {
+void freeTLB(TLB* tlb) {
     free(tlb->cache);
     free(tlb->lru);
     free(tlb);
 }
 
-unsigned int tlb_lookup(TLB* tlb, unsigned int virtual_address, unsigned long curr_time, bool* vpn_found_tlb) {
+unsigned int contains(TLB* tlb, unsigned int virtual_address, unsigned long curr_time, bool* vpn_found_tlb) {
     unsigned int vpn = (virtual_address >> tlb->vpn_shift) & tlb->vpn_mask;
     // printf("vpn: %08lx \t addr: %08lx\n", (unsigned long int) vpn, (unsigned long int) virtual_address);
     unsigned int physical_address = 0;
@@ -47,21 +46,21 @@ unsigned int tlb_lookup(TLB* tlb, unsigned int virtual_address, unsigned long cu
             tlb->cache[i].last_access_time = curr_time;
             *vpn_found_tlb = true;
             tlb->tlb_hit++;
-            break;
+            return tlb->cache[i].frame;
         }
     }
     if (!*vpn_found_tlb) {
-        physical_address = lru_replacement_policy(tlb, vpn, curr_time);
+        physical_address = lruChecker(tlb, vpn, curr_time);
         tlb->tlb_miss++;
     }
     return physical_address;
 }
 
-void tlb_insert(TLB* tlb, unsigned int virtual_address, unsigned int frame, unsigned long curr_time) {
+void insertTLB(TLB* tlb, unsigned int virtual_address, unsigned int frame, unsigned long curr_time) {
     bool vpn_found_tlb;
     unsigned int vpn = (virtual_address >> tlb->vpn_shift) & tlb->vpn_mask;
 
-    tlb_lookup(tlb, virtual_address, curr_time, &vpn_found_tlb);
+    contains(tlb, virtual_address, curr_time, &vpn_found_tlb);
     if (vpn_found_tlb) {
         // update last access time for the existing entry
         for (int i = 0; i < tlb->curr_cache_cap; i++) {
@@ -78,7 +77,7 @@ void tlb_insert(TLB* tlb, unsigned int virtual_address, unsigned int frame, unsi
             tlb->cache[tlb->curr_cache_cap].last_access_time = curr_time;
             tlb->curr_cache_cap++;
         } else {
-            unsigned int lru_vpn = lru_replacement_policy(tlb, vpn, curr_time);
+            unsigned int lru_vpn = lruChecker(tlb, vpn, curr_time);
             for (int i = 0; i < tlb->curr_cache_cap; i++) {
                 if (tlb->cache[i].vpn == lru_vpn) {
                     tlb->cache[i].vpn = vpn;
@@ -91,7 +90,7 @@ void tlb_insert(TLB* tlb, unsigned int virtual_address, unsigned int frame, unsi
     }
 }
 
-unsigned int lru_replacement_policy(TLB* tlb, unsigned int vpn, unsigned long curr_time) {
+unsigned int lruChecker(TLB* tlb, unsigned int vpn, unsigned long curr_time) {
     unsigned int lru_vpn = tlb->lru[0].vpn;
     unsigned long lru_time = tlb->lru[0].last_access_time;
     int lru_index = 0;

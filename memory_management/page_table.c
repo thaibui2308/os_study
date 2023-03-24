@@ -56,6 +56,7 @@ levelPtr createLevel(tablePtr table, unsigned int depth) {
 
     level->depth = depth;
     level->isLeaf = false;
+    level->current_size = 0;
 
     /* Set pageTablePtr pointer to the PageTable */
     level->pageTablePtr = table;
@@ -64,14 +65,13 @@ levelPtr createLevel(tablePtr table, unsigned int depth) {
     if (table->levelCount-1 == depth) { 
         /* Set isLeaf to true and malloc the size of Map** */
         level->isLeaf = true;
-        level->map = (mapPtr*) malloc(sizeof(mapPtr)*table->entryCount[depth]);
-
+        level->map = (Map**) malloc(sizeof(Map) * table->entryCount[depth]);
 
         for (int j = 0; j < table->entryCount[depth]; j++) {
             level->map[j] = createMap();
         }
     } else {
-        level->next = (levelPtr*) malloc(sizeof(levelPtr)*table->entryCount[depth]);
+        level->next = (Level**) malloc(sizeof(Level*) * table->entryCount[depth]);
         for (int j = 0; j < table->entryCount[depth]; j++) {
             level->next[j] = NULL;
         }
@@ -80,8 +80,7 @@ levelPtr createLevel(tablePtr table, unsigned int depth) {
 }
 
 void level_insert_vpn2pfn(levelPtr lPtr, unsigned int address, unsigned int frame) {
-    unsigned int pNumber, totalBits;
-    totalBits = lPtr->pageTablePtr->totalBits;
+    unsigned int pNumber;
     Level* ptr;
 
     ptr = lPtr;
@@ -92,28 +91,34 @@ void level_insert_vpn2pfn(levelPtr lPtr, unsigned int address, unsigned int fram
         pNumber = virtualAddressToVPN(address, 
                                     ptr->pageTablePtr->bitmask[ptr->depth],
                                     ptr->pageTablePtr->bitShift[ptr->depth]);
-
         /* If next level is not found */
         if (ptr->next[pNumber] == NULL) {
             /* Create new level */
             ptr->next[pNumber] = createLevel(ptr->pageTablePtr, ptr->depth+1);
         }
-
+        ptr->current_size++;
         /* Set ptr to new level and increase depth by 1*/
         ptr = ptr->next[pNumber];
     }
 
     /* Processing leaf node */
-    pNumber = bitmask(0, ADDR_SIZE-totalBits-1) & address;
+    pNumber = virtualAddressToVPN(address,
+                ptr->pageTablePtr->bitmask[ptr->depth],
+                ptr->pageTablePtr->bitShift[ptr->depth]);
+
+    ptr->current_size++;
+    if (ptr->map == NULL) {
+        printf("no map entry\n");
+    }
     ptr->map[pNumber]->isValid = true;
     ptr->map[pNumber]->frame = frame;
-
+    // printf("Success!\n\n"); 
+    return;
 }
 
 mapPtr level_lookup_vpn2pfn(levelPtr lPtr, unsigned int virtualAddress) {
     levelPtr ptr;
     unsigned int pNumber;
-    unsigned int totalBits = lPtr->pageTablePtr->totalBits;
 
 
     ptr = lPtr;
@@ -130,14 +135,52 @@ mapPtr level_lookup_vpn2pfn(levelPtr lPtr, unsigned int virtualAddress) {
     }
 
     /* Check if leaf node map contains desired entry */
-    pNumber = bitmask(0, ADDR_SIZE-totalBits-1) & virtualAddress;
-    if (ptr->map[pNumber]->isValid == false) {
+    pNumber = virtualAddressToVPN(virtualAddress,
+                ptr->pageTablePtr->bitmask[ptr->depth],
+                ptr->pageTablePtr->bitShift[ptr->depth]);
+    if (!ptr->map[pNumber]->isValid) {
+        // printf("%08lx pagetable miss\n",(unsigned long int) virtualAddress);
         return NULL;
-    }
+    } 
+    // else {
+    //     printf("%08lx pagetable hit with frame %d\n",
+    //     (unsigned long int) virtualAddress,
+    //     ptr->map[pNumber]->frame);
+    // }
     return ptr->map[pNumber];
 }
 
 /* Additional helpers */
-void byteCount(levelPtr root, unsigned int *count) {
-    
+unsigned int sizeofPageTable(tablePtr table) {
+    size_t size = 0;
+    size += sizeof(PageTable);
+    size += table->levelCount * sizeof(Level);
+    size += table->totalBits / (sizeof(unsigned int) * 8) * sizeof(unsigned int);
+    size += table->levelCount * sizeof(levelPtr);
+    size += table->totalFrames * sizeof(unsigned int);
+    size += sizeof(unsigned int) * 3;
+    size += sizeof(Map);
+
+    size += sizeofLevel(table->tableRootNode);
+
+    return size;
+}
+
+unsigned int sizeofLevel(levelPtr level) {
+    unsigned int entry_count = level->pageTablePtr->entryCount[level->depth];
+    size_t size = 0;
+    size += sizeof(Level);
+    size += level->depth * sizeof(unsigned int);
+    size += level->isLeaf ? sizeof(mapPtr) : sizeof(levelPtr) * (entry_count);
+    size += level->isLeaf ? entry_count * sizeof(Map) : 0;
+
+    if (!level->isLeaf) {
+        for (int i = 0; i < entry_count; i++) {
+            if (level->next[i] != NULL) {
+                size += sizeofLevel(level->next[i]);
+            }
+        }
+    }
+
+    return size;
 }

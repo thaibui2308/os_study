@@ -9,7 +9,8 @@ typedef struct Level {
     unsigned int depth;
     bool isLeaf;
     struct Level** next;
-    mapPtr* map;
+    struct Map** map;
+    unsigned int current_size;
 } Level;
 
 typedef struct Level * levelPtr;
@@ -43,6 +44,7 @@ void level_insert_vpn2pfn(levelPtr lPtr, unsigned int address, unsigned int fram
 mapPtr level_lookup_vpn2pfn(levelPtr ptr, unsigned int virtualAddress);
 
 /* Calculate the total number of bytes the whole PageTable occupied */
-void byteCount(levelPtr root, unsigned int *count);
+unsigned int sizeofPageTable(tablePtr pageTable);
+unsigned int sizeofLevel(levelPtr level);
 
 #endif

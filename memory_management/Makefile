@@ -26,4 +26,4 @@ vaddr_tracereader.o: vaddr_tracereader.c vaddr_tracereader.h
 	$(CC) $(CFLAGS) -o vaddr_tracereader.c
 
 clean:
-	rm *.o mmuwithtlb
+	rm mmuwithtlb
